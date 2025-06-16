@@ -1,23 +1,16 @@
+# Overview
 
-
+This file describes the functions, arguments, examples as well as the pre-requisites needed for each script in this folder. 
 
 ## calculate_sequentiality
 
 This script computes a “sequentiality” loss for paragraphs in a dataset using LLMs.
-
-
-### Dependencies
-
-// Amal u need to add here
-
 
 ### Arguments:
 
 - `run_name` (-r): name under which to save output CSV.
 
 - `dataset (-d)`: CSV name (without .csv) for the dataset in ../data/datasets/ for which sequentiality is to be calculated.
-
-- `split`: optional; supports 'h1', 'h2', 'bio', 'auto', or empty. If 'h1'/'h2', uses first/second half of DataFrame/ or biography/autobiography for paragraph matched data.
 
 - `topic (-t)`: column name for topic (default 'topic').
 
@@ -34,38 +27,62 @@ python compute_sequentiality.py \
   --column=paragraph \
   --topic=topic \
   --model=llama \
-  --split=h1
-
 ```
+
+### Requirements
+
+Dataset must exist and have both a `topic` and `column` column, consisting of the stories in `column` and their corresponding topic in `topic`.
 
 
 ## generate_topics.py
 
-This script generates topic labels for paragraphs (single or paired) in a DataFrame using a LLM pipeline. 
-
-### Dependencies
+This script generates topic labels for paragraphs (one-shot or zero-shot) in a DataFrame using a LLM pipeline. 
 
 ### Arguments
 
-- `--run_name` (-r): name under which to save output CSV.  
-- `--gpu` (-g): GPU index (e.g., 0).  
-- `--column`: column name for unpaired mode (only one paragraph) (default 'para').  
-- `--column2`: second column name for paired mode (default 'para').  
-- `--paired`: flag; if set, runs paired mode, else single paragraph.  
-- `--save_modifier`: suffix for output CSV filename (default 'combined'). 
+- `--run_name` (-r): name under which to save results under output CSV.  
+- `--column`: column name for unpaired mode (only one paragraph) (default 'para'). 
+- `--zero-shot`: to use zero-shot template or not (runs one-shot by default if not passed) 
 
 ### Usage 
 
-#### unpaired paragraph mode
+#### one-shot topic generation
 ```bash
-python generate_topics.py --run_name=myrun --gpu=0 --column=paragraph_text
+python generate_topics.py \
+  --run_name=myrun \
+  --column=paragraph_text \
 ```
 
-#### paired paragraph mode
+#### zero-shot topic generation
 ```bash
-python generate_topics.py --run_name=myrun --gpu=0 --paired --column=bio_para --column2=auto_para --save_modifier=paired
+python generate_topics.py \
+  --run_name=myrun \
+  --column=paragraph_text \
+  --zero-shot
 ```
 
+### Requirements
 
-# Additional Notes AMAL
-How to describe the run_name please re consider that.
+Dataset must contain `column` column of stories.
+
+## create_autobio.py
+
+This script iterates through pairs of autobiographies and biographies, matching paragraphs based on embedding similarity and rouge scores, creating a final dataset of matched paragraphs of autobiographies and biographies.
+
+### Arguments
+
+- `--run_name` (-r): name under which to save results under output CSV (and interim results in `../data/top_pairs/{run_name}`).  
+- `--auto_dir` (-a): directory where the autobiographies are stored under in txt format.
+- `--bio_dir` (-b): directory where the biographies are stored under in txt format.
+
+### Usage 
+```bash
+python create_autobio.py \
+  --run_name=myrun \
+  --auto_dir=myautodir \
+  --bio_dir=mybiodir
+```
+
+### Requirements
+
+Both directories should contain the books in the format `auto_{author}.txt` or `bio_{author}.txt` with no underscores or dots in the authors name. Each corresponding autobiography must have a biography, under the same naming scheme to be matched. 

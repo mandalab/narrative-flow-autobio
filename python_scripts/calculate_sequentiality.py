@@ -47,14 +47,14 @@ def logprobs_sentence(sentence, context, model, tokenizer, device, DEBUG = False
         log_prob_sum += p
     return log_prob_sum
 
-def sequentiality_loss_sentence_wordlevel(prompt, next_sentence, topic, tokenizer, model, device):
+def sequentiality_seq_sentence_wordlevel(prompt, next_sentence, topic, tokenizer, model, device):
     context_l2 = logprobs_sentence(next_sentence, prompt, model, tokenizer, device, DEBUG=False)
     topic_l1 = logprobs_sentence(next_sentence, topic, model, tokenizer, device, DEBUG=False)
 
     score = -1/len(next_sentence.split(' '))*(topic_l1-context_l2)
     return score, topic_l1/len(next_sentence.split(' ')), context_l2/len(next_sentence.split(' '))
 
-def sequentiality_loss_paragraph(paragraph, topic, tokenizer, model, device):
+def sequentiality_seq_paragraph(paragraph, topic, tokenizer, model, device):
     l=''.join(paragraph.split('\n'))
     l = l.split(".")
     l.pop()
@@ -70,7 +70,7 @@ def sequentiality_loss_paragraph(paragraph, topic, tokenizer, model, device):
         next_sentence = next_sentence.strip()
         # Added these 2 strips to remove the empty spaces at the start or end
 
-        score, topic_score, context_score = sequentiality_loss_sentence_wordlevel(prompt, next_sentence, topic, tokenizer, model, device)
+        score, topic_score, context_score = sequentiality_seq_sentence_wordlevel(prompt, next_sentence, topic, tokenizer, model, device)
         logits_.append(score)
         topic_score_list.append(topic_score)
         context_score_list.append(context_score)
@@ -88,15 +88,15 @@ def sequentiality_loss_paragraph(paragraph, topic, tokenizer, model, device):
     return avg, avg_topic, avg_context
 
 def compute_sequentiality(df, column, topic_col, tokenizer, model, device):
-    df[f'{column}_loss'] = np.NaN
-    df[f'{column}_topic_loss'] = np.NaN
-    df[f'{column}_context_loss'] = np.NaN
+    df[f'{column}_seq'] = np.nan
+    df[f'{column}_topic_seq'] = np.nan
+    df[f'{column}_context_seq'] = np.nan
     for j in range(len(df)):
         l=(df[column].iloc[j])
-        loss, topic_loss, contex_loss = sequentiality_loss_paragraph(l,df[topic_col].iloc[j], tokenizer, model, device)
-        df.loc[j, f'{column}_loss'] = loss
-        df.loc[j, f'{column}_topic_loss'] = topic_loss
-        df.loc[j, f'{column}_context_loss'] = contex_loss
+        seq, topic_seq, contex_seq = sequentiality_seq_paragraph(l,df[topic_col].iloc[j], tokenizer, model, device)
+        df.loc[j, f'{column}_seq'] = seq
+        df.loc[j, f'{column}_topic_seq'] = topic_seq
+        df.loc[j, f'{column}_context_seq'] = contex_seq
         # df[f'{column}_prob'].iloc[j] = similarity_score_paragraph(l,df['topic'].iloc[j], tokenizer, model, device)
         if j%25==0 or j==len(df)-1:
             print(f"Paragraph {j} done")
@@ -107,7 +107,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser("Calculate sequentality for the given paragraphs.")
     parser.add_argument("--run_name", "-r", type=str, help="Name of the run to save the generated topics.")
     parser.add_argument("--dataset", "-d", type=str, help="Name of the dataset in the datsets directory.")
-    parser.add_argument("--split", type=str, help="How to split the dataset for parallel processing.", default='')
     parser.add_argument("--topic", "-t", type=str, help="Name of the column in the dataset to use as the topic.", default='topic')
     parser.add_argument("--column", "-c", type=str, help="Name of the column in the dataset to calculate sequentiality for.")
     parser.add_argument("--model", "-m", type=str, help="Name of the model to use for calculating sequentiality.", default='llama')
@@ -147,29 +146,9 @@ if __name__ == '__main__':
     # Remove special characters from model name
     model_name = model_name.replace('/([^a-z0-9 ]+)/gi', '-')
 
-
-    if args.split == 'h1':
-        print("Taking first half of the dataset.")
-        df = df.iloc[:len(df)//2].copy()
-        # Reset index
-        df.reset_index(drop=True, inplace=True)
-        print(df.shape)
-    elif args.split == 'h2':
-        print("Taking second half of the dataset.")
-        df = df.iloc[len(df)//2:].copy()
-        # Reset index
-        df.reset_index(drop=True, inplace=True)
-        print(df.shape)
-    elif args.split == 'bio':
-        print("Taking only the biography paragraphs.")
-    elif args.split == 'auto':
-        print("Taking only the autobiography paragraphs.")
-    else:
-        print("No split specified. Taking the whole dataset.")
-
     df = compute_sequentiality(df, args.column, args.topic, tokenizer, model, DEVICE)
 
     # Make directory if it doesn't exist
     os.makedirs(f'../data/scores/{args.run_name}', exist_ok=True)
 
-    df.to_csv(f'../data/scores/{args.run_name}/{args.dataset}_scores_{model_name}_{args.split}.csv', index=False)
+    df.to_csv(f'../data/scores/{args.run_name}/{args.dataset}_scores_{model_name}.csv', index=False)
